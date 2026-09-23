@@ -1,6 +1,6 @@
 """GraphRenderer: dibuja el diagrama de estados sobre un tk.Canvas.
 
-Convenciones (seccion 5.2 del SDD):
+Convenciones:
 - estado -> circulo
 - estado inicial -> circulo + flecha de entrada corta sin origen
 - estado final -> doble circulo

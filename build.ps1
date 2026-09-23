@@ -1,4 +1,4 @@
-# Empaquetado a ejecutable independiente (seccion 3.3 del SDD).
+# Empaquetado a ejecutable independiente (.exe) con PyInstaller.
 # Uso: powershell -ExecutionPolicy Bypass -File build.ps1
 
 $icon = ""

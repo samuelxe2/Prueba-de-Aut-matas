@@ -1,7 +1,6 @@
 """CU7 - Verificar Consistencia del Grafo.
 
-Reglas basadas en la definicion formal M = (Sigma, Q, q0, F, delta/Delta),
-seccion 4.2 del SDD.
+Reglas basadas en la definicion formal M = (Sigma, Q, q0, F, delta/Delta).
 """
 from __future__ import annotations
 

@@ -1,4 +1,4 @@
-"""CanvasEditor: lienzo interactivo del diagrama de estados (seccion 5.2 del SDD).
+"""CanvasEditor: lienzo interactivo del diagrama de estados.
 
 Capa de Vista: no muta el Automaton directamente, delega toda edicion del
 grafo al AutomatonController y solo se ocupa de eventos de mouse y dibujo.

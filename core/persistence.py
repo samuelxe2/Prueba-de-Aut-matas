@@ -1,4 +1,4 @@
-"""Persistencia de automatas en formato propio .autm (JSON), seccion 7 del SDD."""
+"""Persistencia de automatas en formato propio .autm (JSON)."""
 from __future__ import annotations
 
 import json

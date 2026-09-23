@@ -1,4 +1,4 @@
-"""TapeRenderer: dibuja "el cuadro" (la cinta) sobre un tk.Canvas, seccion 5.3 del SDD.
+"""TapeRenderer: dibuja "el cuadro" (la cinta) sobre un tk.Canvas.
 
 ┌───┬───┬───┬───┬───┬───┬───┐
 │ a │ a │ b │ a │ b │ ≡ │...│

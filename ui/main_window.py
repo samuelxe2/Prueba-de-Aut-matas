@@ -2,7 +2,7 @@
 
 Capa de Vista pura: construye los widgets y, ante cada evento de menu,
 llama al controlador correspondiente. Nunca importa core.* directamente
-ni muta el Automaton por su cuenta (ver seccion 3.1 del SDD).
+ni muta el Automaton por su cuenta.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class MainWindow(tk.Tk):
         self.title(APP_TITLE)
         self.geometry("1200x800")
 
-        # --- Controladores (capa de Controlador, seccion 3.1 del SDD) ---
+        # --- Controladores (capa de Controlador) ---
         self.app_controller = AppController()
         self.validation_controller = ValidationController(self.app_controller)
         self.automaton_controller = AutomatonController(self.app_controller, self.validation_controller)
