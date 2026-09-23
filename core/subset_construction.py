@@ -7,9 +7,12 @@ from __future__ import annotations
 from core.automaton import Automaton
 
 
+DEAD_STATE = "∅"  # simbolo de conjunto vacio, usado como nombre del estado muerto
+
+
 def _name_for(subset: frozenset) -> str:
     if not subset:
-        return "muerto"
+        return DEAD_STATE
     return "{" + ",".join(sorted(subset)) + "}"
 
 

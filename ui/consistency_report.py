@@ -1,16 +1,18 @@
-"""ConsistencyReportDialog (CU7): reporte de validacion del grafo."""
+"""ConsistencyReportView (CU7): reporte de validacion del grafo.
+
+Capa de Vista: delega la validacion en ValidationController y solo se
+ocupa de pintar el resultado.
+"""
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
 
-from core.validator import ConsistencyValidator
-
 
 class ConsistencyReportView(ttk.Frame):
-    def __init__(self, master, automaton):
+    def __init__(self, master, controller):
         super().__init__(master)
-        self.automaton = automaton
+        self.controller = controller
 
         ttk.Button(self, text="Validar consistencia", command=self.refresh).pack(anchor="w", padx=6, pady=6)
         self.kind_var = tk.StringVar()
@@ -24,13 +26,9 @@ class ConsistencyReportView(ttk.Frame):
 
         self.refresh()
 
-    def set_automaton(self, automaton):
-        self.automaton = automaton
-        self.refresh()
-
     def refresh(self):
-        report = ConsistencyValidator(self.automaton).run_all()
-        self.kind_var.set(f"Tipo detectado: {self.automaton.kind()}")
+        report = self.controller.validate()
+        self.kind_var.set(f"Tipo detectado: {self.controller.automaton.kind()}")
 
         self.text.configure(state="normal")
         self.text.delete("1.0", "end")

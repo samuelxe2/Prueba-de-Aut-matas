@@ -1,4 +1,8 @@
-"""TransitionTableView (CU4): tabla delta/Delta editable, sincronizada con el diagrama."""
+"""TransitionTableView (CU4): tabla delta/Delta editable, sincronizada con el diagrama.
+
+Capa de Vista: lee el automata a traves del AutomatonController y delega
+en el toda mutacion (agregar simbolo, fijar destinos de una transicion).
+"""
 from __future__ import annotations
 
 from tkinter import simpledialog, ttk
@@ -7,9 +11,9 @@ from core.automaton import LAMBDA
 
 
 class TransitionTableView(ttk.Frame):
-    def __init__(self, master, automaton, on_change=None):
+    def __init__(self, master, controller, on_change=None):
         super().__init__(master)
-        self.automaton = automaton
+        self.controller = controller
         self.on_change = on_change or (lambda: None)
 
         toolbar = ttk.Frame(self)
@@ -22,9 +26,9 @@ class TransitionTableView(ttk.Frame):
 
         self.refresh()
 
-    def set_automaton(self, automaton):
-        self.automaton = automaton
-        self.refresh()
+    @property
+    def automaton(self):
+        return self.controller.automaton
 
     def _columns(self):
         cols = sorted(self.automaton.alphabet)
@@ -57,7 +61,7 @@ class TransitionTableView(ttk.Frame):
         if sym:
             sym = sym.strip()
         if sym:
-            self.automaton.alphabet.add(sym)
+            self.controller.add_symbol(sym)
             self.on_change()
             self.refresh()
 
@@ -82,11 +86,6 @@ class TransitionTableView(ttk.Frame):
         if new_value is None:
             return
         targets = {t.strip() for t in new_value.split(",") if t.strip()}
-        key = (state, symbol)
-        if targets:
-            self.automaton.states |= targets
-            self.automaton.transitions[key] = targets
-        else:
-            self.automaton.transitions.pop(key, None)
+        self.controller.set_transition_targets(state, symbol, targets)
         self.on_change()
         self.refresh()

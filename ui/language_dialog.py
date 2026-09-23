@@ -1,16 +1,18 @@
-"""LanguageRegistryDialog (CU8): registra nombre/descripcion de L(M) sobre un automata valido."""
+"""LanguageRegistryView (CU8): registra nombre/descripcion de L(M).
+
+Capa de Vista: delega en AutomatonController.register_language(), que a su
+vez exige (via ValidationController) que el automata sea consistente.
+"""
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import messagebox, ttk
 
-from core.validator import ConsistencyValidator
-
 
 class LanguageRegistryView(ttk.Frame):
-    def __init__(self, master, automaton, on_change=None):
+    def __init__(self, master, controller, on_change=None):
         super().__init__(master)
-        self.automaton = automaton
+        self.controller = controller
         self.on_change = on_change or (lambda: None)
 
         form = ttk.Frame(self, padding=10)
@@ -26,19 +28,18 @@ class LanguageRegistryView(ttk.Frame):
 
         ttk.Button(form, text="Registrar lenguaje", command=self._register).grid(row=2, column=1, sticky="w", pady=8)
 
-        self._load_from_model()
+        self.refresh()
 
-    def set_automaton(self, automaton):
-        self.automaton = automaton
-        self._load_from_model()
-
-    def _load_from_model(self):
-        self.name_var.set(self.automaton.language.name)
+    def refresh(self):
+        automaton = self.controller.automaton
+        self.name_var.set(automaton.language.name)
         self.desc_text.delete("1.0", "end")
-        self.desc_text.insert("1.0", self.automaton.language.regex_or_description)
+        self.desc_text.insert("1.0", automaton.language.regex_or_description)
 
     def _register(self):
-        report = ConsistencyValidator(self.automaton).run_all()
+        name = self.name_var.get().strip()
+        description = self.desc_text.get("1.0", "end").strip()
+        report = self.controller.register_language(name, description)
         if not report.is_valid:
             messagebox.showerror(
                 "Automata inconsistente",
@@ -46,7 +47,5 @@ class LanguageRegistryView(ttk.Frame):
                 + "\n".join(report.errors),
             )
             return
-        self.automaton.language.name = self.name_var.get().strip()
-        self.automaton.language.regex_or_description = self.desc_text.get("1.0", "end").strip()
         self.on_change()
         messagebox.showinfo("Lenguaje registrado", "El lenguaje se asocio correctamente al automata.")

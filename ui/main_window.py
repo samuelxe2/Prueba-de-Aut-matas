@@ -1,13 +1,19 @@
-"""MainWindow (CU1/CU2): ventana principal de la aplicacion."""
+"""MainWindow (CU1/CU2): ventana principal de la aplicacion.
+
+Capa de Vista pura: construye los widgets y, ante cada evento de menu,
+llama al controlador correspondiente. Nunca importa core.* directamente
+ni muta el Automaton por su cuenta (ver seccion 3.1 del SDD).
+"""
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from core import persistence
-from core.automaton import Automaton
-from core.subset_construction import subset_construction
-from core.validator import ConsistencyValidator
+from controllers.app_controller import AppController
+from controllers.automaton_controller import AutomatonController
+from controllers.conversion_controller import ConversionController
+from controllers.simulation_controller import SimulationController
+from controllers.validation_controller import ValidationController
 from ui.canvas_editor import CanvasEditor
 from ui.consistency_report import ConsistencyReportView
 from ui.language_dialog import LanguageRegistryView
@@ -23,13 +29,20 @@ class MainWindow(tk.Tk):
         self.title(APP_TITLE)
         self.geometry("1200x800")
 
-        self.automaton = Automaton()
-        self.current_path = None
-        self.dirty = False
+        # --- Controladores (capa de Controlador, seccion 3.1 del SDD) ---
+        self.app_controller = AppController()
+        self.validation_controller = ValidationController(self.app_controller)
+        self.automaton_controller = AutomatonController(self.app_controller, self.validation_controller)
+        self.conversion_controller = ConversionController(self.app_controller, self.validation_controller)
+        self.simulation_controller = SimulationController(self.app_controller, self.validation_controller)
 
         self._build_menu()
         self._build_layout()
         self.protocol("WM_DELETE_WINDOW", self._on_exit)
+
+    @property
+    def automaton(self):
+        return self.app_controller.automaton
 
     # ------------------------------------------------------------------
     # CU2 - Cargar Interfaz Grafica de Usuario
@@ -65,55 +78,48 @@ class MainWindow(tk.Tk):
         top_pane = ttk.PanedWindow(main_pane, orient="horizontal")
         main_pane.add(top_pane, weight=4)
 
-        self.canvas_editor = CanvasEditor(top_pane, self.automaton, on_change=self._on_model_changed)
+        self.canvas_editor = CanvasEditor(top_pane, self.automaton_controller, on_change=self._on_model_changed)
         top_pane.add(self.canvas_editor, weight=3)
 
         notebook = ttk.Notebook(top_pane)
         top_pane.add(notebook, weight=2)
 
-        self.table_view = TransitionTableView(notebook, self.automaton, on_change=self._on_model_changed)
+        self.table_view = TransitionTableView(notebook, self.automaton_controller, on_change=self._on_model_changed)
         notebook.add(self.table_view, text="Tabla de transiciones")
 
-        self.language_view = LanguageRegistryView(notebook, self.automaton, on_change=self._on_model_changed)
+        self.language_view = LanguageRegistryView(notebook, self.automaton_controller, on_change=self._on_model_changed)
         notebook.add(self.language_view, text="Registro de lenguaje")
 
-        self.report_view = ConsistencyReportView(notebook, self.automaton)
+        self.report_view = ConsistencyReportView(notebook, self.validation_controller)
         notebook.add(self.report_view, text="Reporte de consistencia")
         self.notebook = notebook
 
         self.tape_view = TapeSimulatorView(
-            main_pane, self.automaton, on_active_states_changed=self.canvas_editor.set_active_states
+            main_pane, self.simulation_controller, on_active_states_changed=self.canvas_editor.set_active_states
         )
         main_pane.add(self.tape_view, weight=1)
 
     # ------------------------------------------------------------------
+    # Refresco de la Vista tras una mutacion reportada por un Controlador
+    # ------------------------------------------------------------------
     def _on_model_changed(self):
-        self.dirty = True
-        self._ensure_positions()
+        self.automaton_controller.ensure_positions()
         self.canvas_editor.redraw()
         self.table_view.refresh()
         self.report_view.refresh()
 
-    def _ensure_positions(self):
-        next_slot = len(self.automaton.positions)
-        for state in sorted(self.automaton.states):
-            if state not in self.automaton.positions:
-                col, row = next_slot % 5, next_slot // 5
-                self.automaton.positions[state] = (120 + col * 140, 100 + row * 120)
-                next_slot += 1
-
     def _refresh_all_views(self):
-        self.canvas_editor.set_automaton(self.automaton)
-        self.table_view.set_automaton(self.automaton)
-        self.language_view.set_automaton(self.automaton)
-        self.report_view.set_automaton(self.automaton)
-        self.tape_view.set_automaton(self.automaton)
+        self.canvas_editor.reset_view()
+        self.table_view.refresh()
+        self.language_view.refresh()
+        self.report_view.refresh()
+        self.tape_view.reset_view()
 
     # ------------------------------------------------------------------
-    # CU1/CU3 - Ciclo de vida del aplicativo
+    # CU1/CU3 - Ciclo de vida del aplicativo (delegado en AppController)
     # ------------------------------------------------------------------
     def _confirm_discard_changes(self) -> bool:
-        if not self.dirty:
+        if not self.app_controller.dirty:
             return True
         answer = messagebox.askyesnocancel(
             "Cambios sin guardar", "Hay cambios sin guardar. ¿Desea guardarlos antes de continuar?"
@@ -127,9 +133,7 @@ class MainWindow(tk.Tk):
     def _on_new(self):
         if not self._confirm_discard_changes():
             return
-        self.automaton = Automaton()
-        self.current_path = None
-        self.dirty = False
+        self.app_controller.new_automaton()
         self._refresh_all_views()
 
     def _on_open(self):
@@ -139,23 +143,20 @@ class MainWindow(tk.Tk):
         if not path:
             return
         try:
-            self.automaton = persistence.load(path)
+            self.app_controller.open_automaton(path)
         except Exception as exc:
             messagebox.showerror("Error al abrir", str(exc))
             return
-        self.current_path = path
-        self.dirty = False
         self._refresh_all_views()
 
     def _on_save(self) -> bool:
-        if self.current_path is None:
+        if self.app_controller.current_path is None:
             return self._on_save_as()
         try:
-            persistence.save(self.automaton, self.current_path)
+            self.app_controller.save_automaton()
         except Exception as exc:
             messagebox.showerror("Error al guardar", str(exc))
             return False
-        self.dirty = False
         return True
 
     def _on_save_as(self) -> bool:
@@ -164,15 +165,19 @@ class MainWindow(tk.Tk):
         )
         if not path:
             return False
-        self.current_path = path
-        return self._on_save()
+        try:
+            self.app_controller.save_automaton(path)
+        except Exception as exc:
+            messagebox.showerror("Error al guardar", str(exc))
+            return False
+        return True
 
     def _on_exit(self):
         if self._confirm_discard_changes():
             self.destroy()
 
     # ------------------------------------------------------------------
-    # CU5 / CU7 / CU8
+    # CU5 / CU7 / CU8 (delegados en sus controladores)
     # ------------------------------------------------------------------
     def _on_validate(self):
         self.notebook.select(self.report_view)
@@ -181,7 +186,7 @@ class MainWindow(tk.Tk):
             messagebox.showinfo("Consistencia", "El automata es consistente.")
 
     def _on_convert(self):
-        report = ConsistencyValidator(self.automaton).run_all()
+        report = self.validation_controller.validate()
         if not report.is_valid:
             self.notebook.select(self.report_view)
             self.report_view.refresh()
@@ -195,11 +200,7 @@ class MainWindow(tk.Tk):
             "Esto reemplazara el diagrama actual por el AFD equivalente (construccion de subconjuntos). ¿Continuar?",
         ):
             return
-        dfa = subset_construction(self.automaton)
-        dfa.language = self.automaton.language
-        self.automaton = dfa
-        self.current_path = None
-        self.dirty = True
+        dfa, _report = self.conversion_controller.convert_to_dfa()
         self._refresh_all_views()
         self.notebook.select(self.table_view)
 

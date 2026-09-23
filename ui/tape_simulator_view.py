@@ -1,22 +1,24 @@
-"""TapeSimulatorView (CU6): panel inferior con "el cuadro" animado."""
+"""TapeSimulatorView (CU6): panel inferior con "el cuadro" animado.
+
+Capa de Vista: delega el avance de la simulacion en SimulationController
+(que a su vez exige consistencia via ValidationController) y solo dibuja
+los TapeFrame que este entrega.
+"""
 from __future__ import annotations
 
 import tkinter as tk
 from tkinter import ttk
 
-from core.simulator import TapeSimulator
-from core.validator import ConsistencyValidator
 from rendering.tape_renderer import TapeRenderer
 
 STEP_DELAY_MS = 600
 
 
 class TapeSimulatorView(ttk.Frame):
-    def __init__(self, master, automaton, on_active_states_changed=None):
+    def __init__(self, master, controller, on_active_states_changed=None):
         super().__init__(master)
-        self.automaton = automaton
+        self.controller = controller
         self.on_active_states_changed = on_active_states_changed or (lambda states: None)
-        self.simulator = None
         self._playing = False
         self._after_id = None
 
@@ -36,33 +38,31 @@ class TapeSimulatorView(ttk.Frame):
         self.canvas.pack(fill="x", expand=False)
         self.renderer = TapeRenderer(self.canvas)
 
-    def set_automaton(self, automaton):
-        self.automaton = automaton
+    def reset_view(self):
         self._stop()
-        self.simulator = None
+        self.controller.reset()
         self.canvas.delete("all")
+        self.status_var.set("Escriba una cadena y presione Reiniciar.")
 
     # ------------------------------------------------------------------
     def _reset(self):
         self._stop()
-        report = ConsistencyValidator(self.automaton).run_all()
-        if not report.is_valid:
+        word = self.input_var.get()
+        frame, report = self.controller.start(word)
+        if frame is None:
             self.status_var.set("Corrija los errores de consistencia antes de simular.")
             return
-        word = self.input_var.get()
-        self.simulator = TapeSimulator(self.automaton, word)
-        frame = self.simulator.current_frame()
-        self.renderer.draw(self.simulator.tape_symbols, frame)
+        self.renderer.draw(self.controller.tape_symbols, frame)
         self.on_active_states_changed(frame.states)
         self.status_var.set("Listo. Use Paso a paso o Reproducir.")
 
     def _step(self):
-        if self.simulator is None:
+        if self.controller.simulator is None:
             self._reset()
-            if self.simulator is None:
+            if self.controller.simulator is None:
                 return
-        frame = self.simulator.step()
-        self.renderer.draw(self.simulator.tape_symbols, frame)
+        frame = self.controller.step()
+        self.renderer.draw(self.controller.tape_symbols, frame)
         self.on_active_states_changed(frame.states)
         if frame.finished:
             self._stop()
@@ -70,21 +70,21 @@ class TapeSimulatorView(ttk.Frame):
             self.status_var.set(f"Cadena {verdict}.")
 
     def _play(self):
-        if self.simulator is None:
+        if self.controller.simulator is None:
             self._reset()
-            if self.simulator is None:
+            if self.controller.simulator is None:
                 return
         self._playing = True
         self._tick()
 
     def _tick(self):
-        if not self._playing or self.simulator is None:
+        if not self._playing or self.controller.simulator is None:
             return
-        if not self.simulator.has_next():
+        if not self.controller.has_next():
             self._stop()
             return
         self._step()
-        if self.simulator and self.simulator.has_next() and self._playing:
+        if self.controller.has_next() and self._playing:
             self._after_id = self.after(STEP_DELAY_MS, self._tick)
 
     def _stop(self):
